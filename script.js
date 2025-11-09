@@ -154,33 +154,62 @@ document.getElementById("downloadPng").addEventListener("click", () => {
   const svg = renderTarget.querySelector("svg");
   if (!svg) return showMessage("No diagram to download.");
 
+  // Ensure the SVG has a proper namespace
+  if (!svg.getAttribute("xmlns")) {
+    svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  }
+
+  // Serialize SVG to string
   const svgData = new XMLSerializer().serializeToString(svg);
   const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(svgBlob);
+  const svgUrl = URL.createObjectURL(svgBlob);
+
   const img = new Image();
+  img.crossOrigin = "anonymous"; // Fixes canvas tainting issue
 
   img.onload = () => {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
-    const viewBox = svg.viewBox.baseVal;
-    const width = viewBox?.width || img.width;
-    const height = viewBox?.height || img.height;
+
+    // Handle viewBox dimensions
+    const vb = svg.viewBox.baseVal;
+    const width = vb?.width || img.width || 1024;
+    const height = vb?.height || img.height || 768;
+
     canvas.width = width;
     canvas.height = height;
-    ctx.clearRect(0, 0, width, height);
+
+    // Fill white background (optional)
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+
     ctx.drawImage(img, 0, 0, width, height);
 
+    // Convert canvas to PNG blob
     canvas.toBlob((blob) => {
+      if (!blob) {
+        showMessage("Failed to create PNG blob.");
+        return;
+      }
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = `${uploadedFileName}.png`;
       link.click();
       URL.revokeObjectURL(link.href);
     }, "image/png");
-    URL.revokeObjectURL(url);
+
+    // Cleanup
+    URL.revokeObjectURL(svgUrl);
   };
-  img.src = url;
+
+  img.onerror = () => {
+    showMessage("Error converting SVG to PNG.");
+    URL.revokeObjectURL(svgUrl);
+  };
+
+  img.src = svgUrl;
 });
+
 
 // === Download MMD ===
 document.getElementById("downloadMmd").addEventListener("click", () => {
