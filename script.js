@@ -1,21 +1,36 @@
 let uploadedBase64Image = null;
 let selectedModel = "gpt-4.1";
+
 const modelSelector = document.getElementById("modelSelector");
 const convertButton = document.getElementById("convertButton");
+const mermaidTextarea = document.getElementById("mermaidCode");
+const renderTarget = document.getElementById("mermaidRenderTarget");
+const previewMessage = document.getElementById("previewMessage");
 
-modelSelector.addEventListener("change", (e) => (selectedModel = e.target.value));
+// Reset state on model change
+modelSelector.addEventListener("change", (e) => {
+  selectedModel = e.target.value;
+  uploadedBase64Image = null;
+
+  // Reset UI
+  document.getElementById("imagePreview").classList.add("hidden");
+  document.getElementById("imageInput").value = "";
+  document.getElementById("results").classList.add("hidden");
+  renderTarget.innerHTML = "";
+  previewMessage.textContent = "Upload a new image for this model.";
+  showMessage(`Model switched to ${selectedModel}.`);
+});
 
 function previewImage(event) {
   const file = event.target.files[0];
   const preview = document.getElementById("imagePreview");
-  const button = document.getElementById("convertButton");
   if (file) {
     const reader = new FileReader();
     reader.onload = (e) => {
       uploadedBase64Image = e.target.result.split(",")[1];
       preview.src = e.target.result;
       preview.classList.remove("hidden");
-      button.disabled = false;
+      convertButton.disabled = false;
     };
     reader.readAsDataURL(file);
   }
@@ -23,12 +38,11 @@ function previewImage(event) {
 
 async function generateMermaidCode() {
   if (!uploadedBase64Image) return showMessage("Please upload an image first.");
-
   convertButton.disabled = true;
   convertButton.textContent = "Processing...";
   document.getElementById("results").classList.remove("hidden");
-  document.getElementById("mermaidCode").value = "";
-  document.getElementById("previewMessage").textContent = "Generating diagram...";
+  mermaidTextarea.value = "";
+  previewMessage.textContent = "Generating diagram...";
 
   try {
     const response = await fetch("/api/generate", {
@@ -39,7 +53,10 @@ async function generateMermaidCode() {
 
     const result = await response.json();
     if (result.error) throw new Error(result.error);
-    document.getElementById("mermaidCode").value = result.output.trim();
+
+    const code = result.output?.trim();
+    if (!code) throw new Error("No Mermaid code returned.");
+    mermaidTextarea.value = code;
     renderDiagram();
   } catch (err) {
     showMessage("Error: " + err.message);
@@ -49,28 +66,36 @@ async function generateMermaidCode() {
   }
 }
 
+// Live re-render whenever user edits Mermaid code
+mermaidTextarea?.addEventListener("input", debounce(renderDiagram, 500));
+
 async function renderDiagram() {
-  const code = document.getElementById("mermaidCode").value.trim();
-  const target = document.getElementById("mermaidRenderTarget");
-  const msg = document.getElementById("previewMessage");
-  target.innerHTML = "";
+  const code = mermaidTextarea.value.trim();
+  renderTarget.innerHTML = "";
   if (!code) {
-    msg.textContent = "Enter Mermaid code to preview.";
+    previewMessage.textContent = "Enter Mermaid code to preview.";
     return;
   }
   try {
     const { svg } = await mermaid.render("graphDiv", code);
-    target.innerHTML = svg;
-    msg.classList.add("hidden");
+    renderTarget.innerHTML = svg;
+    previewMessage.classList.add("hidden");
   } catch {
-    msg.textContent = "Invalid Mermaid syntax.";
-    showMessage("Mermaid rendering error.");
+    previewMessage.textContent = "Invalid Mermaid syntax.";
   }
+}
+
+function debounce(fn, delay) {
+  let timeout;
+  return function (...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fn.apply(this, args), delay);
+  };
 }
 
 function showMessage(text) {
   const box = document.getElementById("messageBox");
   box.textContent = text;
   box.classList.remove("hidden");
-  setTimeout(() => box.classList.add("hidden"), 4000);
+  setTimeout(() => box.classList.add("hidden"), 3000);
 }

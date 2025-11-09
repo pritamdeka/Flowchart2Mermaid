@@ -7,7 +7,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Missing image or model." });
     }
 
-    // ---------- GPT-4.x branch ----------
+    // ---------- GPT branch ----------
     if (model.startsWith("gpt-")) {
       const messages = [
         { role: "system", content: prompt },
@@ -15,10 +15,7 @@ export default async function handler(req, res) {
           role: "user",
           content: [
             { type: "text", text: "Convert this diagram image to valid Mermaid code." },
-            {
-              type: "image_url",
-              image_url: { url: `data:image/png;base64,${image}` }, // ✅ correct OpenAI format
-            },
+            { type: "image_url", image_url: { url: `data:image/png;base64,${image}` } },
           ],
         },
       ];
@@ -39,20 +36,18 @@ export default async function handler(req, res) {
       return res.status(200).json({ output });
     }
 
-    // ---------- GEMINI-2.5-FLASH branch ----------
+    // ---------- GEMINI 2.5 FLASH branch ----------
     if (model.startsWith("gemini")) {
-      // Google GenAI uses /v1/models/... endpoint (not v1beta)
       const payload = {
         contents: [
           {
             role: "user",
             parts: [
-              { text: "Convert this diagram image into a clean, valid Mermaid diagram." },
+              { text: `${prompt}\n\nConvert this diagram image to valid Mermaid code.` },
               { inlineData: { mimeType: "image/png", data: image } },
             ],
           },
         ],
-        system_instruction: { parts: [{ text: prompt }] },
       };
 
       const response = await fetch(
@@ -67,14 +62,12 @@ export default async function handler(req, res) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error?.message || "Gemini API error");
 
-      // Extract the Mermaid code only (remove markdown fences if present)
       let output = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
       output = output.replace(/```mermaid\s*/gi, "").replace(/```/g, "").trim();
 
       return res.status(200).json({ output });
     }
 
-    // ---------- Unsupported ----------
     return res.status(400).json({ error: "Unsupported model selected." });
   } catch (err) {
     console.error("Error in handler:", err);
