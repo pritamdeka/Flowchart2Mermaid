@@ -91,7 +91,6 @@ async function generateMermaidCode() {
 }
 
 // === Render Diagram ===
-document.getElementById("updatePreview").addEventListener("click", renderDiagram);
 mermaidTextarea.addEventListener("input", debounce(renderDiagram, 600));
 
 async function renderDiagram() {
