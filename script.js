@@ -15,11 +15,12 @@ const convertButton = document.getElementById("convertButton");
 const mermaidTextarea = document.getElementById("mermaidCode");
 const renderTarget = document.getElementById("mermaidRenderTarget");
 const previewMessage = document.getElementById("previewMessage");
+const loadingOverlay = document.getElementById("loadingOverlay");
 
 convertButton.addEventListener("click", generateMermaidCode);
 mermaid.initialize({ startOnLoad: false, securityLevel: "loose" });
 
-// --- Handle Model Switching ---
+// --- Model Switching ---
 modelSelector.addEventListener("change", (e) => {
   selectedModel = e.target.value;
   uploadedBase64Image = null;
@@ -32,16 +33,16 @@ modelSelector.addEventListener("change", (e) => {
   showMessage(`Model switched to ${selectedModel}.`);
 });
 
-// --- Clean and store filename ---
+// --- Filename Cleanup ---
 function cleanFileName(name) {
   name = name.split(".")[0];
-  name = name.replace(/[_\-\s]*\d{2,5}x\d{2,5}[_\-\s]*/gi, ""); // remove dimensions
+  name = name.replace(/[_\-\s]*\d{2,5}x\d{2,5}[_\-\s]*/gi, ""); // remove 123x456 suffixes
   name = name.replace(/[^a-zA-Z0-9_\-]/g, "_");
   if (name.length > 30) name = name.substring(0, 30);
   return name || "diagram";
 }
 
-// --- Image Preview ---
+// --- Preview Image ---
 function previewImage(event) {
   const file = event.target.files[0];
   const preview = document.getElementById("imagePreview");
@@ -62,7 +63,7 @@ function previewImage(event) {
 async function generateMermaidCode() {
   if (!uploadedBase64Image) return showMessage("Please upload an image first.");
   convertButton.disabled = true;
-  convertButton.textContent = "Processing...";
+  loadingOverlay.classList.remove("hidden");
   document.getElementById("results").classList.remove("hidden");
   mermaidTextarea.value = "";
   previewMessage.textContent = "Generating diagram...";
@@ -84,6 +85,7 @@ async function generateMermaidCode() {
   } catch (err) {
     showMessage("Error: " + err.message);
   } finally {
+    loadingOverlay.classList.add("hidden");
     convertButton.disabled = false;
     convertButton.textContent = "Generate Code";
   }
@@ -115,7 +117,7 @@ async function renderDiagram() {
   }
 }
 
-// --- Open in Mermaid Live Editor ---
+// --- Open in Mermaid Live Editor (auto copy + title) ---
 document.getElementById("openEditorButton").addEventListener("click", async () => {
   const code = mermaidTextarea.value.trim();
   if (!code) return showMessage("No Mermaid code to edit yet!");
@@ -144,21 +146,23 @@ document.getElementById("downloadSvg").addEventListener("click", () => {
   URL.revokeObjectURL(link.href);
 });
 
-// --- Download PNG (Transparent background optional) ---
+// --- Download PNG ---
 document.getElementById("downloadPng").addEventListener("click", () => {
   const svg = renderTarget.querySelector("svg");
   if (!svg) return showMessage("No diagram to download.");
   const svgData = new XMLSerializer().serializeToString(svg);
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
   const img = new Image();
   const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
   const url = URL.createObjectURL(svgBlob);
 
   img.onload = () => {
-    canvas.width = img.width;
-    canvas.height = img.height;
-    ctx.clearRect(0, 0, canvas.width, canvas.height); // transparent bg
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const ratio = window.devicePixelRatio || 1;
+    canvas.width = img.width * ratio;
+    canvas.height = img.height * ratio;
+    ctx.scale(ratio, ratio);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0);
     URL.revokeObjectURL(url);
     canvas.toBlob((blob) => {
@@ -172,7 +176,7 @@ document.getElementById("downloadPng").addEventListener("click", () => {
   img.src = url;
 });
 
-// --- Download .mmd ---
+// --- Download MMD ---
 document.getElementById("downloadMmd").addEventListener("click", () => {
   const code = mermaidTextarea.value.trim();
   if (!code) return showMessage("No Mermaid code to save.");
