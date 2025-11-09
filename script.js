@@ -7,12 +7,16 @@ const mermaidTextarea = document.getElementById("mermaidCode");
 const renderTarget = document.getElementById("mermaidRenderTarget");
 const previewMessage = document.getElementById("previewMessage");
 
-// Reset state on model change
+// Ensure Mermaid starts clean
+mermaid.initialize({ startOnLoad: false, securityLevel: "loose" });
+
+/* -----------------------------
+   MODEL CHANGE RESET
+------------------------------ */
 modelSelector.addEventListener("change", (e) => {
   selectedModel = e.target.value;
   uploadedBase64Image = null;
 
-  // Reset UI
   document.getElementById("imagePreview").classList.add("hidden");
   document.getElementById("imageInput").value = "";
   document.getElementById("results").classList.add("hidden");
@@ -21,6 +25,9 @@ modelSelector.addEventListener("change", (e) => {
   showMessage(`Model switched to ${selectedModel}.`);
 });
 
+/* -----------------------------
+   IMAGE PREVIEW
+------------------------------ */
 function previewImage(event) {
   const file = event.target.files[0];
   const preview = document.getElementById("imagePreview");
@@ -36,6 +43,9 @@ function previewImage(event) {
   }
 }
 
+/* -----------------------------
+   GENERATE MERMAID CODE
+------------------------------ */
 async function generateMermaidCode() {
   if (!uploadedBase64Image) return showMessage("Please upload an image first.");
   convertButton.disabled = true;
@@ -57,7 +67,7 @@ async function generateMermaidCode() {
     const code = result.output?.trim();
     if (!code) throw new Error("No Mermaid code returned.");
     mermaidTextarea.value = code;
-    renderDiagram();
+    renderDiagram(); // auto-render
   } catch (err) {
     showMessage("Error: " + err.message);
   } finally {
@@ -66,33 +76,55 @@ async function generateMermaidCode() {
   }
 }
 
-// Live re-render whenever user edits Mermaid code
-mermaidTextarea?.addEventListener("input", debounce(renderDiagram, 500));
-
+/* -----------------------------
+   RENDER DIAGRAM
+------------------------------ */
 async function renderDiagram() {
   const code = mermaidTextarea.value.trim();
-  renderTarget.innerHTML = "";
+  renderTarget.innerHTML = ""; // clear old diagram
+
   if (!code) {
     previewMessage.textContent = "Enter Mermaid code to preview.";
+    previewMessage.classList.remove("hidden");
     return;
   }
+
   try {
-    const { svg } = await mermaid.render("graphDiv", code);
-    renderTarget.innerHTML = svg;
+    // Create a temporary div for rendering
+    const tempDiv = document.createElement("div");
+    tempDiv.classList.add("mermaid");
+    tempDiv.textContent = code;
+
+    renderTarget.innerHTML = ""; // clear again
+    renderTarget.appendChild(tempDiv);
+
+    // Force Mermaid to process the new content
+    await mermaid.run({ nodes: [tempDiv] });
+
     previewMessage.classList.add("hidden");
-  } catch {
+  } catch (err) {
+    console.error(err);
     previewMessage.textContent = "Invalid Mermaid syntax.";
+    previewMessage.classList.remove("hidden");
   }
 }
+
+/* -----------------------------
+   LIVE EDIT (debounced)
+------------------------------ */
+mermaidTextarea?.addEventListener("input", debounce(renderDiagram, 600));
 
 function debounce(fn, delay) {
   let timeout;
-  return function (...args) {
+  return (...args) => {
     clearTimeout(timeout);
-    timeout = setTimeout(() => fn.apply(this, args), delay);
+    timeout = setTimeout(() => fn(...args), delay);
   };
 }
 
+/* -----------------------------
+   UTILITIES
+------------------------------ */
 function showMessage(text) {
   const box = document.getElementById("messageBox");
   box.textContent = text;
