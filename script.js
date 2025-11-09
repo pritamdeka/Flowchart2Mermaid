@@ -1,3 +1,12 @@
+// --- Include compression utility ---
+function compressToPakoBase64(input) {
+  const json = JSON.stringify({ code: input, mermaid: { theme: "default" } });
+  const data = new TextEncoder().encode(json);
+  const deflated = pako.deflate(data);
+  const str = String.fromCharCode.apply(null, deflated);
+  return btoa(str);
+}
+
 let uploadedBase64Image = null;
 let selectedModel = "gpt-4.1";
 
@@ -7,12 +16,12 @@ const mermaidTextarea = document.getElementById("mermaidCode");
 const renderTarget = document.getElementById("mermaidRenderTarget");
 const previewMessage = document.getElementById("previewMessage");
 
-// ✅ Ensure the Generate button works
+// ✅ Fix: reattach Generate button
 convertButton.addEventListener("click", generateMermaidCode);
 
 mermaid.initialize({ startOnLoad: false, securityLevel: "loose" });
 
-// Reset on model change
+// Reset when model changes
 modelSelector.addEventListener("change", (e) => {
   selectedModel = e.target.value;
   uploadedBase64Image = null;
@@ -98,11 +107,15 @@ async function renderDiagram() {
 document.getElementById("openEditorButton").addEventListener("click", () => {
   const code = mermaidTextarea.value.trim();
   if (!code) return showMessage("No Mermaid code to edit yet!");
-  // Encode the Mermaid code in the URL so it opens preloaded
-  const encoded = encodeURIComponent(code);
-  const editorUrl = `https://mermaid.live/edit#pako:${btoa(encoded)}`;
-  window.open(editorUrl, "_blank");
-  showMessage("Opening Mermaid Live Editor in a new tab...");
+  try {
+    const compressed = compressToPakoBase64(code);
+    const editorUrl = `https://mermaid.live/edit#pako:${compressed}`;
+    window.open(editorUrl, "_blank");
+    showMessage("Opening Mermaid Live Editor in new tab...");
+  } catch (err) {
+    showMessage("Could not encode Mermaid code for editor.");
+    console.error(err);
+  }
 });
 
 // ---------- Download Buttons ----------
