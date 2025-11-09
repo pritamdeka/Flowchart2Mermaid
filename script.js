@@ -7,12 +7,12 @@ const mermaidTextarea = document.getElementById("mermaidCode");
 const renderTarget = document.getElementById("mermaidRenderTarget");
 const previewMessage = document.getElementById("previewMessage");
 
-// ✅ FIX: reattach event listener
+// ✅ Ensure the Generate button works
 convertButton.addEventListener("click", generateMermaidCode);
 
 mermaid.initialize({ startOnLoad: false, securityLevel: "loose" });
 
-// Reset when model changes
+// Reset on model change
 modelSelector.addEventListener("change", (e) => {
   selectedModel = e.target.value;
   uploadedBase64Image = null;
@@ -94,29 +94,15 @@ async function renderDiagram() {
   }
 }
 
-// ---------- Mermaid Live Editor ----------
-const openEditorButton = document.getElementById("openEditorButton");
-const editorContainer = document.getElementById("editorContainer");
-const editorIframe = document.getElementById("mermaidEditor");
-
-openEditorButton.addEventListener("click", () => {
-  editorContainer.classList.toggle("hidden");
-  if (!editorContainer.classList.contains("hidden")) {
-    const code = mermaidTextarea.value.trim();
-    if (!code) return showMessage("No Mermaid code to edit yet!");
-    editorIframe.contentWindow.postMessage({ type: "setCode", code }, "https://mermaid.live");
-    showMessage("Loaded diagram into Mermaid Live Editor!");
-    editorContainer.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-});
-
-window.addEventListener("message", (event) => {
-  if (event.origin !== "https://mermaid.live") return;
-  const { type, code } = event.data;
-  if (type === "codeUpdate" && code) {
-    mermaidTextarea.value = code;
-    renderDiagram();
-  }
+// ---------- Open in new Mermaid Live Editor tab ----------
+document.getElementById("openEditorButton").addEventListener("click", () => {
+  const code = mermaidTextarea.value.trim();
+  if (!code) return showMessage("No Mermaid code to edit yet!");
+  // Encode the Mermaid code in the URL so it opens preloaded
+  const encoded = encodeURIComponent(code);
+  const editorUrl = `https://mermaid.live/edit#pako:${btoa(encoded)}`;
+  window.open(editorUrl, "_blank");
+  showMessage("Opening Mermaid Live Editor in a new tab...");
 });
 
 // ---------- Download Buttons ----------
