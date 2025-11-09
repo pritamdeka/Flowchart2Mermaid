@@ -16,7 +16,7 @@ const mermaidTextarea = document.getElementById("mermaidCode");
 const renderTarget = document.getElementById("mermaidRenderTarget");
 const previewMessage = document.getElementById("previewMessage");
 
-// ✅ Fix: reattach Generate button
+// ✅ Attach Generate button event
 convertButton.addEventListener("click", generateMermaidCode);
 
 mermaid.initialize({ startOnLoad: false, securityLevel: "loose" });
@@ -103,17 +103,19 @@ async function renderDiagram() {
   }
 }
 
-// ---------- Open in new Mermaid Live Editor tab ----------
-document.getElementById("openEditorButton").addEventListener("click", () => {
+// ---------- Open in new Mermaid Live Editor tab (with clipboard copy) ----------
+document.getElementById("openEditorButton").addEventListener("click", async () => {
   const code = mermaidTextarea.value.trim();
   if (!code) return showMessage("No Mermaid code to edit yet!");
   try {
+    // Copy code to clipboard as backup
+    await navigator.clipboard.writeText(code);
     const compressed = compressToPakoBase64(code);
     const editorUrl = `https://mermaid.live/edit#pako:${compressed}`;
     window.open(editorUrl, "_blank");
-    showMessage("Opening Mermaid Live Editor in new tab...");
+    showMessage("Code copied! Opening Mermaid Live Editor in new tab...");
   } catch (err) {
-    showMessage("Could not encode Mermaid code for editor.");
+    showMessage("Could not open editor or copy code.");
     console.error(err);
   }
 });
