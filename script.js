@@ -1,4 +1,3 @@
-// --- Include compression utility ---
 function compressToPakoBase64(input) {
   const json = JSON.stringify({ code: input, mermaid: { theme: "default" } });
   const data = new TextEncoder().encode(json);
@@ -8,6 +7,7 @@ function compressToPakoBase64(input) {
 }
 
 let uploadedBase64Image = null;
+let uploadedFileName = "diagram";
 let selectedModel = "gpt-4.1";
 
 const modelSelector = document.getElementById("modelSelector");
@@ -16,15 +16,14 @@ const mermaidTextarea = document.getElementById("mermaidCode");
 const renderTarget = document.getElementById("mermaidRenderTarget");
 const previewMessage = document.getElementById("previewMessage");
 
-// ✅ Attach Generate button event
 convertButton.addEventListener("click", generateMermaidCode);
-
 mermaid.initialize({ startOnLoad: false, securityLevel: "loose" });
 
-// Reset when model changes
+// --- Handle Model Switching ---
 modelSelector.addEventListener("change", (e) => {
   selectedModel = e.target.value;
   uploadedBase64Image = null;
+  uploadedFileName = "diagram";
   document.getElementById("imagePreview").classList.add("hidden");
   document.getElementById("imageInput").value = "";
   document.getElementById("results").classList.add("hidden");
@@ -33,10 +32,21 @@ modelSelector.addEventListener("change", (e) => {
   showMessage(`Model switched to ${selectedModel}.`);
 });
 
+// --- Clean and store filename ---
+function cleanFileName(name) {
+  name = name.split(".")[0];
+  name = name.replace(/[_\-\s]*\d{2,5}x\d{2,5}[_\-\s]*/gi, ""); // remove dimensions
+  name = name.replace(/[^a-zA-Z0-9_\-]/g, "_");
+  if (name.length > 30) name = name.substring(0, 30);
+  return name || "diagram";
+}
+
+// --- Image Preview ---
 function previewImage(event) {
   const file = event.target.files[0];
   const preview = document.getElementById("imagePreview");
   if (file) {
+    uploadedFileName = cleanFileName(file.name);
     const reader = new FileReader();
     reader.onload = (e) => {
       uploadedBase64Image = e.target.result.split(",")[1];
@@ -48,6 +58,7 @@ function previewImage(event) {
   }
 }
 
+// --- Generate Mermaid Code ---
 async function generateMermaidCode() {
   if (!uploadedBase64Image) return showMessage("Please upload an image first.");
   convertButton.disabled = true;
@@ -78,6 +89,7 @@ async function generateMermaidCode() {
   }
 }
 
+// --- Render Diagram ---
 document.getElementById("updatePreview").addEventListener("click", renderDiagram);
 mermaidTextarea.addEventListener("input", debounce(renderDiagram, 600));
 
@@ -97,63 +109,82 @@ async function renderDiagram() {
     renderTarget.appendChild(tempDiv);
     await mermaid.run({ nodes: [tempDiv] });
     previewMessage.classList.add("hidden");
-  } catch (err) {
+  } catch {
     previewMessage.textContent = "Invalid Mermaid syntax.";
     previewMessage.classList.remove("hidden");
   }
 }
 
-// ---------- Open in new Mermaid Live Editor tab (with clipboard copy) ----------
+// --- Open in Mermaid Live Editor ---
 document.getElementById("openEditorButton").addEventListener("click", async () => {
   const code = mermaidTextarea.value.trim();
   if (!code) return showMessage("No Mermaid code to edit yet!");
   try {
-    // Copy code to clipboard as backup
     await navigator.clipboard.writeText(code);
     const compressed = compressToPakoBase64(code);
-    const editorUrl = `https://mermaid.live/edit#pako:${compressed}`;
+    const encodedName = encodeURIComponent(uploadedFileName);
+    const editorUrl = `https://mermaid.live/edit#title=${encodedName}.mmd&pako:${compressed}`;
     window.open(editorUrl, "_blank");
-    showMessage("Code copied! Opening Mermaid Live Editor in new tab...");
+    showMessage(`Copied and opening "${uploadedFileName}.mmd" in new tab...`);
   } catch (err) {
     showMessage("Could not open editor or copy code.");
     console.error(err);
   }
 });
 
-// ---------- Download Buttons ----------
-function getTimestampedName(ext = "svg") {
-  const now = new Date();
-  const formatted = now
-    .toISOString()
-    .replace("T", "_")
-    .slice(0, 16)
-    .replace(/:/g, "-");
-  return `diagram_${formatted}.${ext}`;
-}
-
+// --- Download SVG ---
 document.getElementById("downloadSvg").addEventListener("click", () => {
   const svg = renderTarget.querySelector("svg");
   if (!svg) return showMessage("No diagram to download.");
   const blob = new Blob([svg.outerHTML], { type: "image/svg+xml" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = getTimestampedName("svg");
+  link.download = `${uploadedFileName}.svg`;
   link.click();
   URL.revokeObjectURL(link.href);
 });
 
+// --- Download PNG (Transparent background optional) ---
+document.getElementById("downloadPng").addEventListener("click", () => {
+  const svg = renderTarget.querySelector("svg");
+  if (!svg) return showMessage("No diagram to download.");
+  const svgData = new XMLSerializer().serializeToString(svg);
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  const img = new Image();
+  const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(svgBlob);
+
+  img.onload = () => {
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // transparent bg
+    ctx.drawImage(img, 0, 0);
+    URL.revokeObjectURL(url);
+    canvas.toBlob((blob) => {
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${uploadedFileName}.png`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }, "image/png");
+  };
+  img.src = url;
+});
+
+// --- Download .mmd ---
 document.getElementById("downloadMmd").addEventListener("click", () => {
   const code = mermaidTextarea.value.trim();
   if (!code) return showMessage("No Mermaid code to save.");
   const blob = new Blob([code], { type: "text/plain" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = getTimestampedName("mmd");
+  link.download = `${uploadedFileName}.mmd`;
   link.click();
   URL.revokeObjectURL(link.href);
 });
 
-// ---------- Utility ----------
+// --- Helpers ---
 function debounce(fn, delay) {
   let timeout;
   return (...args) => {
