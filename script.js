@@ -203,32 +203,34 @@ document.getElementById("downloadJpeg").addEventListener("click", () => {
 
 
 // === Download MMD ===
-// === Download .MMD (safe UTF-8, cross-browser) ===
+// === Download as plain .TXT (most reliable) ===
 document.getElementById("downloadMmd").addEventListener("click", () => {
-  const code = mermaidTextarea.value.trim();
-  if (!code) return showMessage("No Mermaid code to save.");
+  const code = mermaidTextarea.value;
+  if (!code || !code.trim()) {
+    showMessage("No Mermaid code to save.");
+    return;
+  }
 
-  // Ensure proper UTF-8 encoding and file extension
-  const blob = new Blob([new TextEncoder().encode(code)], {
-    type: "text/plain;charset=utf-8",
-  });
+  const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
+  const blobUrl = window.URL.createObjectURL(blob);
 
   const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = `${uploadedFileName}.mmd`;
-
-  // Append temporarily for Safari compatibility
+  link.href = blobUrl;
+  link.download = `${uploadedFileName || "diagram"}.txt`;
+  link.style.display = "none";
   document.body.appendChild(link);
+
   link.click();
 
-  // Delay revocation for safety
+  // cleanup after short delay
   setTimeout(() => {
-    URL.revokeObjectURL(link.href);
+    window.URL.revokeObjectURL(blobUrl);
     link.remove();
   }, 1000);
 
-  showMessage(`Saved ${uploadedFileName}.mmd`);
+  showMessage(`✅ Saved ${uploadedFileName}.txt`);
 });
+
 
 
 // === Helpers ===
