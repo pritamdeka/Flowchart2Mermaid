@@ -7,9 +7,12 @@ const mermaidTextarea = document.getElementById("mermaidCode");
 const renderTarget = document.getElementById("mermaidRenderTarget");
 const previewMessage = document.getElementById("previewMessage");
 
+// ✅ FIX: reattach event listener
+convertButton.addEventListener("click", generateMermaidCode);
+
 mermaid.initialize({ startOnLoad: false, securityLevel: "loose" });
 
-// Reset on model change
+// Reset when model changes
 modelSelector.addEventListener("change", (e) => {
   selectedModel = e.target.value;
   uploadedBase64Image = null;
@@ -91,7 +94,7 @@ async function renderDiagram() {
   }
 }
 
-// ---------- Mermaid Live Editor Integration ----------
+// ---------- Mermaid Live Editor ----------
 const openEditorButton = document.getElementById("openEditorButton");
 const editorContainer = document.getElementById("editorContainer");
 const editorIframe = document.getElementById("mermaidEditor");
@@ -116,7 +119,7 @@ window.addEventListener("message", (event) => {
   }
 });
 
-// ---------- Download buttons with timestamped filenames ----------
+// ---------- Download Buttons ----------
 function getTimestampedName(ext = "svg") {
   const now = new Date();
   const formatted = now
