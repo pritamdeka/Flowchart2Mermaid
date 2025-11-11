@@ -117,42 +117,11 @@ async function renderDiagram() {
   }
 }
 
-// === Toolbar ===
-const toolbar = document.createElement("div");
-toolbar.className = "absolute top-2 right-2 flex gap-2 z-40";
-toolbar.innerHTML = `
-  <button id="addNodeBtn" class="px-2 py-1 bg-green-500 text-white rounded">+ Node</button>
-  <button id="deleteNodeBtn" class="px-2 py-1 bg-red-500 text-white rounded">− Node</button>
-`;
-document.querySelector("#diagramPreview").appendChild(toolbar);
-
-document.getElementById("addNodeBtn").onclick = () => {
-  const id = prompt("Enter node ID:");
-  const label = prompt("Enter node label:");
-  const from = prompt("Connect FROM node ID (optional):");
-  let code = mermaidTextarea.value.trim();
-  if (!code.startsWith("graph") && !code.startsWith("flowchart")) code = "flowchart TD\n" + code;
-  code += `\n${id}["${label}"]`;
-  if (from) code += `\n${from} --> ${id}`;
-  mermaidTextarea.value = code;
-  renderDiagram();
-};
-
-document.getElementById("deleteNodeBtn").onclick = () => {
-  deleteMode = !deleteMode;
-  showMessage(deleteMode ? "🗑️ Delete mode ON" : "❌ Delete mode OFF");
-};
-
 // === Inline Editing ===
 function enableInlineEditing() {
   renderTarget.querySelectorAll("text").forEach((t) => {
     t.style.cursor = "pointer";
     t.onclick = (e) => {
-      if (deleteMode) {
-        deleteNode(t.textContent.trim());
-        deleteMode = false;
-        return;
-      }
       const oldText = t.textContent.trim();
       const input = document.createElement("input");
       input.value = oldText;
@@ -172,16 +141,6 @@ function enableInlineEditing() {
 function updateNodeText(oldText, newText) {
   const code = mermaidTextarea.value.replaceAll(oldText, newText);
   mermaidTextarea.value = code;
-  renderDiagram();
-}
-
-function deleteNode(label) {
-  let code = mermaidTextarea.value;
-  const idMatch = code.match(new RegExp(`\\w+\\[["']?${label}["']?\\]`));
-  if (!idMatch) return showMessage("Node not found.");
-  const id = idMatch[0].split("[")[0];
-  const pattern = new RegExp(`^.*${id}.*$`, "gm");
-  mermaidTextarea.value = code.replace(pattern, "").trim();
   renderDiagram();
 }
 
@@ -227,7 +186,7 @@ diagramArea.addEventListener("drop", (e) => {
   draggedShape = null;
 });
 
-// === Downloads, AI Assistant, and Helpers (unchanged) ===
+// === Download SVG ===
 document.getElementById("downloadSvg").addEventListener("click", () => {
   const svg = renderTarget.querySelector("svg");
   if (!svg) return showMessage("No diagram to download.");
@@ -239,6 +198,7 @@ document.getElementById("downloadSvg").addEventListener("click", () => {
   URL.revokeObjectURL(link.href);
 });
 
+// === Download .MMD ===
 document.getElementById("downloadMmd").addEventListener("click", () => {
   const code = mermaidTextarea.value;
   if (!code || !code.trim()) return showMessage("No Mermaid code to save.");
@@ -252,6 +212,7 @@ document.getElementById("downloadMmd").addEventListener("click", () => {
   showMessage(`✅ Saved ${uploadedFileName}.mmd`);
 });
 
+// === Mermaid Live Editor ===
 document.getElementById("openEditorButton").addEventListener("click", async () => {
   const code = mermaidTextarea.value.trim();
   if (!code) return showMessage("No Mermaid code to edit yet!");
