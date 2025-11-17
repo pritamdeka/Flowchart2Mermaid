@@ -1,4 +1,4 @@
-# Diagram → Mermaid Converter
+# Flowchart → Mermaid Converter
 
 A web app that:
 - Uploads diagram images  
