@@ -324,18 +324,6 @@ function fitToScreen() {
   applyTransform();
 }
 
-// === Wheel Zoom ===
-scrollBox.addEventListener(
-  "wheel",
-  (e) => {
-    e.preventDefault();
-    const delta = e.deltaY < 0 ? 1.1 : 0.9;
-    scale *= delta;
-    applyTransform();
-  },
-  { passive: false }
-);
-
 // === Drag to Pan ===
 scrollBox.addEventListener("mousedown", (e) => {
   isPanning = true;
