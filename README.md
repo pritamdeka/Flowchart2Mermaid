@@ -10,8 +10,6 @@ A web app that:
 ### Environment Variables (Vercel)
 | Key | Purpose |
 |-----|----------|
-| `OPENAI_API_KEY` | OpenAI GPT-4.1 access |
-| `GEMINI_API_KEY` | Google Gemini 2.5 Flash access |
 | `PROMPT_TEXT` | System prompt text |
 
 ### Deploy
