@@ -129,11 +129,14 @@ document.addEventListener("DOMContentLoaded", () => {
             modal.className =
                 "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50";
 
-            // Modal HTML structure - Note: input type is set to "password" for masking.
+            // Modal HTML structure - Added error display area
             modal.innerHTML = `
                 <div class="bg-white rounded-xl shadow-xl p-6 w-96 space-y-4 text-gray-700">
                     <h2 class="text-lg font-semibold text-indigo-600 text-center">API Key Required</h2>
                     <p class="text-sm text-gray-500 text-center">This feature requires your API key for the selected model.</p>
+                    
+                    <div id="modalError" class="hidden text-sm text-red-600 bg-red-100 p-2 rounded"></div>
+
                     <input type="password" id="modalApiKeyInput" placeholder="Paste API key here (e.g., sk-...)"
                                 class="w-full border border-gray-300 p-2 rounded focus:ring-indigo-500 focus:border-indigo-500" />
                     <div class="flex items-center gap-2">
@@ -155,8 +158,20 @@ document.addEventListener("DOMContentLoaded", () => {
             const input = modal.querySelector("#modalApiKeyInput");
             const fileInput = modal.querySelector("#apiKeyFileInput");
             const fileNameDisplay = modal.querySelector("#fileNameDisplay");
+            const modalError = modal.querySelector("#modalError");
             const cancelBtn = modal.querySelector("#cancelApiKey");
             const confirmBtn = modal.querySelector("#confirmApiKey");
+
+            // Helper to display error inside the modal and reset input fields
+            function displayModalError(message) {
+                modalError.textContent = message;
+                modalError.classList.remove('hidden');
+                // Reset the input fields so user can immediately retry
+                input.value = ''; 
+                fileInput.value = null; 
+                fileNameDisplay.textContent = 'No file chosen';
+                input.focus();
+            }
 
             // Handle file upload selection
             fileInput.addEventListener("change", (e) => {
@@ -177,8 +192,27 @@ document.addEventListener("DOMContentLoaded", () => {
                 resolve(null);
             };
 
+            // CORE CHANGE: Validation on Confirm button click
             confirmBtn.onclick = () => {
                 const key = input.value.trim();
+                if (!key) {
+                    displayModalError("API Key cannot be empty.");
+                    return;
+                }
+
+                // Client-side format validation (based on selected model)
+                const isGpt = selectedModel.startsWith("gpt-");
+                
+                if (isGpt && !key.startsWith("sk-")) {
+                    displayModalError(`Invalid format. GPT keys must start with 'sk-'. Please re-enter your key.`);
+                    return;
+                }
+                if (!isGpt && key.startsWith("sk-")) {
+                    displayModalError(`Invalid key. Gemini keys should not start with 'sk-'. Please re-enter your key.`);
+                    return;
+                }
+                
+                // If the key passes client-side format check, we close the modal and resolve.
                 document.body.removeChild(modal);
                 resolve(key);
             };
@@ -191,7 +225,16 @@ document.addEventListener("DOMContentLoaded", () => {
     convertButton.addEventListener("click", async () => {
         if (!uploadedBase64Image) return showMessage("Please upload an image first.");
 
-        // 1. Prompt for API Key (if not already set)
+        // We removed the key check here and moved it inside generateMermaidCode()
+        generateMermaidCode();
+    });
+
+    async function generateMermaidCode() {
+        if (!uploadedBase64Image) {
+            return showMessage("Please upload an image first.");
+        }
+
+        // 1. Check/Prompt for API Key (Reset logic happens in catch block)
         if (!userApiKey) {
             userApiKey = await promptForApiKey();
             if (!userApiKey) {
@@ -203,21 +246,15 @@ document.addEventListener("DOMContentLoaded", () => {
         // 2. Quick Key Validation (client-side guess)
         const isGpt = selectedModel.startsWith("gpt-");
         if (isGpt && !userApiKey.startsWith("sk-")) {
+            // NOTE: This client-side validation should rarely be hit now, as promptForApiKey handles it.
+            userApiKey = null;
             return showMessage("Invalid API key format for GPT models (expected 'sk-').");
         }
         if (!isGpt && userApiKey.startsWith("sk-")) {
+            userApiKey = null;
              return showMessage("Invalid API key for Gemini models (should not start with 'sk-').");
         }
         
-        // 3. Start Conversion
-        generateMermaidCode();
-    });
-
-    async function generateMermaidCode() {
-        if (!uploadedBase64Image || !userApiKey) {
-            return showMessage("Please upload an image and provide the API key.");
-        }
-
         convertButton.disabled = true;
         loadingOverlay.classList.remove("hidden");
         document.getElementById("results").classList.remove("hidden");
@@ -228,9 +265,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
         try {
-            // --- Placeholder for actual API call ---
-            // The existing fetch call assumes a backend endpoint at /api/generate:
-            
+            // --- API Call ---
             const response = await fetch("/api/generate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -251,6 +286,8 @@ document.addEventListener("DOMContentLoaded", () => {
             showMessage("Code generated successfully!");
         } catch (err) {
             showMessage("Error: " + err.message);
+            // FIX: Reset API key on server/network error (in case server validation failed)
+            userApiKey = null; 
         } finally {
             loadingOverlay.classList.add("hidden");
             convertButton.disabled = false;
@@ -362,7 +399,12 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!currentCode) return showMessage("Please generate or enter Mermaid code first.");
         if (!prompt) return showMessage("Please enter a modification for the AI.");
 
-        // 1. Prompt for API Key (if not already set)
+        // We removed the key check here and moved it inside runAiEdit()
+        runAiEdit(prompt, currentCode);
+    });
+
+    async function runAiEdit(prompt, currentCode) {
+        // 1. Check/Prompt for API Key (Reset logic happens in catch block)
         if (!userApiKey) {
             userApiKey = await promptForApiKey();
             if (!userApiKey) {
@@ -371,11 +413,17 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        // 2. Start AI Edit Process
-        runAiEdit(prompt, currentCode);
-    });
-
-    async function runAiEdit(prompt, currentCode) {
+        // 2. Quick Key Validation (client-side guess)
+        const isGpt = selectedModel.startsWith("gpt-");
+        if (isGpt && !userApiKey.startsWith("sk-")) {
+            userApiKey = null;
+            return showMessage("Invalid API key format for GPT models (expected 'sk-').");
+        }
+        if (!isGpt && userApiKey.startsWith("sk-")) {
+            userApiKey = null;
+             return showMessage("Invalid API key for Gemini models (should not start with 'sk-').");
+        }
+        
         runAiButton.disabled = true;
         loadingOverlay.classList.remove("hidden");
         aiPromptInput.value = '';
@@ -408,6 +456,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
         } catch (err) {
             showMessage("AI Edit Error: " + err.message);
+            // FIX: Reset API key on server/network error
+            userApiKey = null;
         } finally {
             loadingOverlay.classList.add("hidden");
             runAiButton.disabled = false;
