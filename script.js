@@ -73,7 +73,7 @@ document.addEventListener("DOMContentLoaded", () => {
         uploadedBase64Image = e.target.result.split(",")[1];
         preview.src = e.target.result;
         preview.classList.remove("hidden");
-        convertButton.disabled = false;
+        convertButton.disabled = false;  // Enable the convert button once image is uploaded
       };
       reader.readAsDataURL(file);
     }
